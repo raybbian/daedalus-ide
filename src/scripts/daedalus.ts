@@ -1,6 +1,8 @@
 export type PixelColor = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 export type GridMap = Map<string, [PixelColor, boolean]>;
 
+export const programTemplate: GridMap = new Map<string, [PixelColor, boolean]>().set("0_0", [12, false]).set("1_0", [0, false]);
+
 export function colorToVec3(color: PixelColor) {
 	switch (color) {
 		case 0: return [0.3647059, 0.15294118, 0.3647059];
@@ -50,7 +52,7 @@ export function getRandomColor(): PixelColor {
 export const instructionNamesAndId: [string, string, PixelColor][] = [
 	["Pop *", "Pops the top value off of the stack.", 0],
 	["Push(n) *", "Pushes the signed value n onto the stack.", 1],
-	["Duplicate(n) *", "Duplicates the value of the nth element (unsigned) from the top.", 2],
+	["Dup(n) *", "Duplicates the value of the nth element (unsigned) from the top.", 2],
 	["Add *", "Adds (+) the top two values on the stack, and pushes the result.", 3],
 	["And *", "Ands (&) the top two values on the stack, and pushes the result.", 4],
 	["Not *", "Nots (!) the top value on the stack, and pushes the result.", 5],
@@ -60,8 +62,8 @@ export const instructionNamesAndId: [string, string, PixelColor][] = [
 	["Ret", "Jumps to the caller of this subroutine", 9],
 	["Halt", "Halts the program, terminating it.", 10],
 	["NoOp", "Does nothing. A no-operation.", 11],
-	["Subroutine(n)", "Marks the start of a subroutine with id n (signed).", 12],
-	["Comparison", "The first statement read right, fwd, left is executed if the top value is > 0.", 13],
-	["Instruction", "Marks the start of a stack-based instruction (Instructions 0-7).", 14],
-	["Background", "Background color that is ignored during parsing.", 15],
+	["Sbr(n)", "Marks the start of a subroutine with id n (signed).", 12],
+	["Cmp", "The first statement read right, fwd, left is executed if the top value is > 0.", 13],
+	["Inst", "Marks the start of a stack-based instruction (Instructions 0-7).", 14],
+	["Bg", "Background color that is ignored during parsing.", 15],
 ]
