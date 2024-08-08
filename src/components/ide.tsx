@@ -39,7 +39,8 @@ export default function Ide() {
 			setIdeConfig(typedConfig);
 		}
 		loadConfig();
-	}, [])
+		ideRef.current?.focus();
+	}, [ideRef])
 
 	// Store the IDE Config when it changes
 	useEffect(() => {
