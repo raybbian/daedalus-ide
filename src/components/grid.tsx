@@ -1,21 +1,21 @@
-import { GridMap, colorToVec3, getRandomColor } from "@/scripts/daedalus";
+import { GridMap, PixelColor, colorToVec3, getRandomColor } from "@/scripts/daedalus";
 import { MouseEventHandler, useEffect, useRef, useState, MutableRefObject } from "react"
 import gridLineVertShader from "@/shaders/grid_lines_v.glsl";
 import gridLineFragShader from "@/shaders/grid_lines_f.glsl";
 import pixelVertShader from "@/shaders/grid_pixel_v.glsl";
 import pixelFragShader from "@/shaders/grid_pixel_f.glsl";
 
-export default function Grid({ gridItems, onMouseDown, onMouseUp, onMouseMove }: {
+export default function Grid({ gridItems, redrawRef, selectedInstruction }: {
 	gridItems: MutableRefObject<GridMap>,
-	onMouseDown?: MouseEventHandler<HTMLDivElement>,
-	onMouseUp?: MouseEventHandler<HTMLDivElement>,
-	onMouseMove?: MouseEventHandler<HTMLDivElement>,
+	redrawRef: MutableRefObject<(() => void) | null>,
+	selectedInstruction: PixelColor,
 }) {
-	const [pos, setPos] = useState<[number, number]>([0, 0]);
 	const [dragging, setDragging] = useState(false);
 	const [prevMousePos, setPrevMousePos] = useState<[number, number] | null>(null);
 	const [curMousePos, setCurMousePos] = useState<[number, number]>([0, 0]);
 	const [unitLen, setUnitLen] = useState(50);
+	const [pos, setPos] = useState<[number, number]>([unitLen, unitLen]);
+	const guiOffset = useRef<[number, number]>([0, 0]);
 	const minUnitLen = 15;
 	const maxUnitLen = 200;
 
@@ -35,6 +35,7 @@ export default function Grid({ gridItems, onMouseDown, onMouseUp, onMouseMove }:
 	const lineProgramRef = useRef<WebGLProgram | null>(null);
 	const pixelProgramRef = useRef<WebGLProgram | null>(null);
 	const glRef = useRef<WebGL2RenderingContext | null>(null);
+	const pixelsChanged = useRef(false);
 
 	function initWebGL() {
 		const canvas = canvasRef.current;
@@ -144,19 +145,16 @@ export default function Grid({ gridItems, onMouseDown, onMouseUp, onMouseMove }:
 			gl.vertexAttribPointer(aInstanceColor, 4, gl.FLOAT, false, 24, 8);
 			gl.vertexAttribDivisor(aInstanceColor, 1); // This makes it an instanced attribute
 			gl.enableVertexAttribArray(aInstanceColor);
-
-			// pixelInstances.current = new Float32Array([
-			// 	0, 0, 1.0, 0.0, 0.0,
-			// 	0, 1, 0.0, 1.0, 0.0,
-			// 	1, 0, 0.0, 0.0, 1.0,
-			// 	1, 1, 1.0, 1.0, 0.0,
-			// ]);
-			// gl.bufferData(gl.ARRAY_BUFFER, pixelInstances.current, gl.STATIC_DRAW);
 		}
 		initPixelProgram();
+
+		gl.enable(gl.BLEND);
+		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 	}
 
 	useEffect(() => {
+		redrawRef.current = render;
+
 		function handleResize() {
 			const canvas = canvasRef.current;
 			const gl = glRef.current;
@@ -164,6 +162,9 @@ export default function Grid({ gridItems, onMouseDown, onMouseUp, onMouseMove }:
 			const pixelProgram = pixelProgramRef.current;
 			if (canvas == null || gl == null || lineProgram == null || pixelProgram == null) return;
 			if (canvas.width != canvas.clientWidth || canvas.width != canvas.clientHeight) {
+				const box = canvas.getBoundingClientRect();
+				guiOffset.current = [box.left, box.top];
+
 				canvas.width = canvas.clientWidth;
 				canvas.height = canvas.clientHeight;
 				gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -182,9 +183,17 @@ export default function Grid({ gridItems, onMouseDown, onMouseUp, onMouseMove }:
 
 		window.addEventListener('resize', handleResize);
 		initWebGL();
-		handleResize();
+
+		// intialize main function
+		pixelsChanged.current = true;
+		gridItems.current.set("0_0", [12, false]);
+		gridItems.current.set("1_0", [0, false]);
+
 		updateUnitLen(unitLen);
 		updatePos(pos);
+		handleResize();
+
+		requestAnimationFrame(render);
 
 		return () => window.removeEventListener('resize', handleResize);
 	}, []);
@@ -200,18 +209,22 @@ export default function Grid({ gridItems, onMouseDown, onMouseUp, onMouseMove }:
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		gl.useProgram(pixelProgram);
 
-		let pixelData = new Float32Array(gridItems.current.size * 6);
-		let i = 0;
-		gridItems.current.forEach(([col, isPreview], [x, y]) => {
-			pixelData[i++] = x;
-			pixelData[i++] = y;
-			const vec3col = colorToVec3(col);
-			pixelData[i++] = vec3col[0];
-			pixelData[i++] = vec3col[1];
-			pixelData[i++] = vec3col[2];
-			pixelData[i++] = isPreview ? 0.3 : 1.0;
-		});
-		gl.bufferData(gl.ARRAY_BUFFER, pixelData, gl.STATIC_DRAW);
+		if (pixelsChanged.current) {
+			let pixelData = new Float32Array(gridItems.current.size * 6);
+			let i = 0;
+			gridItems.current.forEach(([col, isPreview], loc) => {
+				let pos = loc.split('_').map((num) => parseInt(num));
+				pixelData[i++] = pos[0];
+				pixelData[i++] = pos[1];
+				const vec3col = colorToVec3(col);
+				pixelData[i++] = vec3col[0];
+				pixelData[i++] = vec3col[1];
+				pixelData[i++] = vec3col[2];
+				pixelData[i++] = isPreview ? 0.25 : 1.0;
+			});
+			gl.bufferData(gl.ARRAY_BUFFER, pixelData, gl.DYNAMIC_DRAW);
+			pixelsChanged.current = false;
+		}
 		gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gridItems.current.size);
 	}
 
@@ -228,8 +241,6 @@ export default function Grid({ gridItems, onMouseDown, onMouseUp, onMouseMove }:
 		gl.useProgram(pixelProgram);
 		uUnitLen = gl.getUniformLocation(pixelProgram, 'uUnitLen');
 		gl.uniform1f(uUnitLen, newUnitLen);
-
-		requestAnimationFrame(render);
 	}
 
 	function updatePos(newPos: [number, number]) {
@@ -245,8 +256,6 @@ export default function Grid({ gridItems, onMouseDown, onMouseUp, onMouseMove }:
 		gl.useProgram(pixelProgram);
 		uPos = gl.getUniformLocation(pixelProgram, 'uPos');
 		gl.uniform2f(uPos, newPos[0], newPos[1]);
-
-		requestAnimationFrame(render);
 	}
 
 	return (
@@ -254,49 +263,63 @@ export default function Grid({ gridItems, onMouseDown, onMouseUp, onMouseMove }:
 			// ref={canvasRef}
 			className={`w-full h-full bg-daedalus15 relative ${dragging && "cursor-grabbing"} overflow-hidden`}
 			onMouseDown={(e) => {
-				if (e.button == 1 || e.button == 2) {
+				const gridPos = getGridAt(curMousePos);
+				if (e.button == 1) {
 					e.preventDefault();
 					setDragging(true);
 				} else if (e.button == 0) {
-					const gridPos = getGridAt([e.pageX, e.pageY]);
-					const col = getRandomColor();
-					gridItems.current.set(gridPos, [col, false]);
+					gridItems.current.set(`${gridPos[0]}_${gridPos[1]}`, [selectedInstruction, false]);
+					pixelsChanged.current = true;
+					requestAnimationFrame(render);
+				} else if (e.button == 2) {
+					gridItems.current.delete(`${gridPos[0]}_${gridPos[1]}`);
+					pixelsChanged.current = true;
 					requestAnimationFrame(render);
 				}
-				if (onMouseDown) onMouseDown(e);
 			}}
 			onMouseUp={(e) => {
-				if (e.button == 1 || e.button == 2) {
+				if (e.button == 1) {
 					e.preventDefault();
 					setDragging(false);
 					setPrevMousePos(null);
 				}
-				if (onMouseUp) onMouseUp(e);
 			}}
 			onMouseLeave={(_) => {
 				setDragging(false);
 				setPrevMousePos(null);
 			}}
 			onMouseMove={(e) => {
+				if (!canvasRef.current) return;
+				const mouseX = e.pageX - guiOffset.current[0];
+				const mouseY = e.pageY - guiOffset.current[1];
 				if (dragging) {
 					let deltaX = 0;
 					let deltaY = 0;
 					if (prevMousePos != null) {
-						deltaX = e.pageX - prevMousePos[0];
-						deltaY = e.pageY - prevMousePos[1];
+						deltaX = mouseX - prevMousePos[0];
+						deltaY = mouseY - prevMousePos[1];
 					}
-					setPrevMousePos([e.pageX, e.pageY]);
+					setPrevMousePos([mouseX, mouseY]);
 					updatePos([pos[0] + deltaX, pos[1] + deltaY]);
+					requestAnimationFrame(render);
 				}
-				setCurMousePos([e.pageX, e.pageY]);
-				if (onMouseMove) onMouseMove(e);
+				setCurMousePos([mouseX, mouseY]);
 			}}
 			onWheel={(e) => {
 				const newUnitLen = unitLen - e.deltaY * 0.1;
 				if (newUnitLen < minUnitLen || newUnitLen > maxUnitLen) return;
+				const curGrid = getGridAt(curMousePos);
+				const ratio = unitLen - newUnitLen;
 				updateUnitLen(newUnitLen);
+				updatePos([pos[0] + ratio * curGrid[0], pos[1] + ratio * curGrid[1]]);
+				requestAnimationFrame(render);
+			}}
+			onContextMenu={(e) => {
+				e.preventDefault();
+				return false;
 			}}
 		>
+			<div className="absolute left-4 bottom-2">x: {getGridAt(curMousePos)[0]} y: {getGridAt(curMousePos)[1]}</div>
 			<canvas width={500} height={300} className={"w-full h-full"} ref={canvasRef} />
 		</div>
 	)

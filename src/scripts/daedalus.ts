@@ -1,5 +1,5 @@
 export type PixelColor = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
-export type GridMap = Map<[number, number], [PixelColor, boolean]>;
+export type GridMap = Map<string, [PixelColor, boolean]>;
 
 export function colorToVec3(color: PixelColor) {
 	switch (color) {
@@ -22,6 +22,46 @@ export function colorToVec3(color: PixelColor) {
 	}
 }
 
+export function colorToHex(color: PixelColor) {
+	switch (color) {
+		case 0: return '#5d275d';
+		case 1: return '#b13e53';
+		case 2: return '#ef7d57';
+		case 3: return '#ffcd75';
+		case 4: return '#a7f070';
+		case 5: return '#38b764';
+		case 6: return '#257179';
+		case 7: return '#29366f';
+		case 8: return '#3b5dc9';
+		case 9: return '#41a6f6';
+		case 10: return '#73eff7';
+		case 11: return '#f4f4f4';
+		case 12: return '#94b0c2';
+		case 13: return '#566c86';
+		case 14: return '#333c57';
+		case 15: return '#1a1c2c';
+	}
+}
+
 export function getRandomColor(): PixelColor {
 	return Math.floor(Math.random() * 15) as PixelColor;
 }
+
+export const instructionNamesAndId: [string, string, PixelColor][] = [
+	["Pop *", "Pops the top value off of the stack.", 0],
+	["Push(n) *", "Pushes the signed value n onto the stack.", 1],
+	["Duplicate(n) *", "Duplicates the value of the nth element (unsigned) from the top.", 2],
+	["Add *", "Adds (+) the top two values on the stack, and pushes the result.", 3],
+	["And *", "Ands (&) the top two values on the stack, and pushes the result.", 4],
+	["Not *", "Nots (!) the top value on the stack, and pushes the result.", 5],
+	["Getc *", "Reads a value from stdin, and pushes it to the stack.", 6],
+	["Putc *", "Outputs the top value of the stack to stdout.", 7],
+	["Jmp(n)", "Jumps to the subroutine marked by id n (signed).", 8],
+	["Ret", "Jumps to the caller of this subroutine", 9],
+	["Halt", "Halts the program, terminating it.", 10],
+	["NoOp", "Does nothing. A no-operation.", 11],
+	["Subroutine(n)", "Marks the start of a subroutine with id n (signed).", 12],
+	["Comparison", "The first statement read right, fwd, left is executed if the top value is > 0.", 13],
+	["Instruction", "Marks the start of a stack-based instruction (Instructions 0-7).", 14],
+	["Background", "Background color that is ignored during parsing.", 15],
+]
