@@ -1,7 +1,5 @@
 export type PixelColor = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
-export type GridMap = Map<string, [PixelColor, boolean]>;
-
-export const programTemplate: GridMap = new Map<string, [PixelColor, boolean]>().set("0_0", [12, false]).set("1_0", [0, false]);
+export type GridMap = Map<string, PixelColor>;
 
 export function colorToVec3(color: PixelColor) {
 	switch (color) {
@@ -98,13 +96,13 @@ export function numberToPixelArray(num: bigint | '' | '-', isSigned: boolean): P
 	} else if (num >= BigInt(0)) {
 		const arr = unsignedToPixelArray(num);
 		if (isSigned && arr[0] >= 4) arr.unshift(0);
-		return arr;
+		return arr.reverse();
 	} else {
 		const absNum = BigInt(-1) * num;
 		let msb = absNum.toString(2).length;
 		msb += (3 - msb % 3);
 		const newBig = BigInt("0b1".padEnd(msb + 3, '0'));
 		const pretendVal = newBig + num;
-		return unsignedToPixelArray(pretendVal);
+		return unsignedToPixelArray(pretendVal).reverse();
 	}
 }

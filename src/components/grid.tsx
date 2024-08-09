@@ -5,7 +5,7 @@ import gridLineFragShader from "@/shaders/grid_lines_f.glsl";
 import pixelVertShader from "@/shaders/grid_pixel_v.glsl";
 import pixelFragShader from "@/shaders/grid_pixel_f.glsl";
 import { DrawContext } from "@/scripts/draw_context";
-import Toolbar from "./toolbar";
+import Toolbar from "@/components/toolbar";
 import { IdeConfig } from "@/scripts/config";
 
 export function getGridAt(atPos: [number, number], pos: [number, number], unitLen: number): [number, number] {
@@ -49,7 +49,6 @@ export function renderGrid(
 	gridItems: GridMap,
 	pixelsChanged: boolean
 ) {
-	console.log("Rendering grid! Pixels Changed: " + pixelsChanged);
 	if (gl == null || lineProgram == null || pixelProgram == null) return;
 	gl.clear(gl.COLOR_BUFFER_BIT);
 	gl.useProgram(lineProgram);
@@ -59,7 +58,7 @@ export function renderGrid(
 	if (pixelsChanged) {
 		let pixelData = new Float32Array(gridItems.size * 6);
 		let i = 0;
-		gridItems.forEach(([col, isPreview], loc) => {
+		gridItems.forEach((col, loc) => {
 			let pos = loc.split('_').map((num) => parseInt(num));
 			pixelData[i++] = pos[0];
 			pixelData[i++] = pos[1];
@@ -67,7 +66,7 @@ export function renderGrid(
 			pixelData[i++] = vec3col[0];
 			pixelData[i++] = vec3col[1];
 			pixelData[i++] = vec3col[2];
-			pixelData[i++] = isPreview ? 0.25 : 1.0;
+			pixelData[i++] = 1.0;
 		});
 		gl.bufferData(gl.ARRAY_BUFFER, pixelData, gl.DYNAMIC_DRAW);
 	}
@@ -80,7 +79,7 @@ export const defaultUnitLen = 40;
 
 export type GridMouseHandler = (pos: [number, number], e: ReactMouseEvent<HTMLDivElement, MouseEvent>) => void;
 
-export default function Grid({ drawCtxRef, glRef, lineProgramRef, pixelProgramRef, onMouseDown, onMouseGrid, setSettingsOpen, selectedInstruction, ideConfig }: {
+export default function Grid({ drawCtxRef, glRef, lineProgramRef, pixelProgramRef, onMouseDown, onMouseGrid, setSettingsOpen, selectedInstruction, ideConfig, ioRef }: {
 	drawCtxRef: MutableRefObject<DrawContext>,
 	glRef: MutableRefObject<WebGL2RenderingContext | null>,
 	lineProgramRef: MutableRefObject<WebGLProgram | null>,
@@ -90,6 +89,7 @@ export default function Grid({ drawCtxRef, glRef, lineProgramRef, pixelProgramRe
 	setSettingsOpen: Dispatch<SetStateAction<boolean>>,
 	selectedInstruction: PixelColor,
 	ideConfig: IdeConfig,
+	ioRef: MutableRefObject<HTMLCanvasElement | null>,
 }) {
 	// position of mouse and mouse interaction
 	const [dragging, setDragging] = useState(false);
@@ -98,13 +98,12 @@ export default function Grid({ drawCtxRef, glRef, lineProgramRef, pixelProgramRe
 
 	// offsets and scale for grid
 	const unitLen = useRef(defaultUnitLen);
-	const pos = useRef<[number, number]>([defaultUnitLen, defaultUnitLen]);
+	const pos = useRef<[number, number]>([0, 0]);
 
 	const guiOffset = useRef<[number, number]>([0, 0]);
 	const gridCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
 	useEffect(() => {
-		console.log("Intializing Grid Canvas!");
 		function initWebGL() {
 			const canvas = gridCanvasRef.current;
 			if (canvas == null) return;
@@ -256,7 +255,7 @@ export default function Grid({ drawCtxRef, glRef, lineProgramRef, pixelProgramRe
 		initWebGL();
 
 		updateGLUnitLen(glRef.current, defaultUnitLen, [lineProgramRef.current, pixelProgramRef.current]);
-		updateGLPos(glRef.current, [defaultUnitLen, defaultUnitLen], [lineProgramRef.current, pixelProgramRef.current]);
+		updateGLPos(glRef.current, [0, 0], [lineProgramRef.current, pixelProgramRef.current]);
 
 		requestAnimationFrame(() => renderGrid(
 			glRef.current,
@@ -359,25 +358,22 @@ export default function Grid({ drawCtxRef, glRef, lineProgramRef, pixelProgramRe
 					updateUnitLen={(nUnitLen: number) => {
 						updateGLUnitLen(glRef.current, nUnitLen, [lineProgramRef.current, pixelProgramRef.current]);
 						unitLen.current = nUnitLen;
-						requestAnimationFrame(() => renderGrid(
-							glRef.current,
-							lineProgramRef.current,
-							pixelProgramRef.current,
-							drawCtxRef.current.gridMap,
-							false
-						));
 					}}
 					updatePos={(nPos: [number, number]) => {
 						updateGLPos(glRef.current, nPos, [lineProgramRef.current, pixelProgramRef.current]);
 						pos.current = nPos;
+					}}
+					render={(changedPixels: boolean) => {
 						requestAnimationFrame(() => renderGrid(
 							glRef.current,
 							lineProgramRef.current,
 							pixelProgramRef.current,
 							drawCtxRef.current.gridMap,
-							false
+							changedPixels
 						));
 					}}
+					ioRef={ioRef}
+					drawCtxRef={drawCtxRef}
 				/>
 			</div>
 		</div>

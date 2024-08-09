@@ -11,8 +11,9 @@ export default function Ide() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [ideConfig, setIdeConfig] = useState(defaultConfig);
 
-	const drawCtxRef = useRef<DrawContext>(new DrawContext(true).initWithDefaultProgram());
+	const drawCtxRef = useRef<DrawContext>(new DrawContext().initWithDefaultProgram());
 	const ideRef = useRef<HTMLDivElement | null>(null);
+	const ioRef = useRef<HTMLCanvasElement | null>(null);
 
 	// WebGL stuff
 	const lineProgramRef = useRef<WebGLProgram | null>(null);
@@ -100,6 +101,7 @@ export default function Ide() {
 					setSettingsOpen={setSettingsOpen}
 					selectedInstruction={selectedInstruction}
 					ideConfig={ideConfig}
+					ioRef={ioRef}
 				/>
 			</div>
 			{
@@ -113,6 +115,7 @@ export default function Ide() {
 					/>
 				</div>
 			}
+			<canvas className="hidden" ref={ioRef} />
 		</div >
 	);
 }
