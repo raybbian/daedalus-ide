@@ -1,21 +1,16 @@
 import { PixelColor } from "./daedalus";
 
 export type KeybindConfig = "qwerty" | "colemak" | "colemakdh" | "dvorak";
-export type DrawMode = "free" | "assisted";
 
 export type IdeConfig = {
 	keybindConfig: KeybindConfig,
-	drawMode: DrawMode,
 }
 
 export const defaultConfig: IdeConfig = {
 	keybindConfig: "qwerty",
-	drawMode: "assisted",
 }
 
 export const keybindConfigs: KeybindConfig[] = ["qwerty", "colemak", "colemakdh", "dvorak"]
-
-export const drawModes: DrawMode[] = ["assisted", "free"]
 
 export function keyToColorWithConfig(key: string, config: IdeConfig): PixelColor | null {
 	switch (config.keybindConfig) {
@@ -25,6 +20,20 @@ export function keyToColorWithConfig(key: string, config: IdeConfig): PixelColor
 		case "dvorak": return dvorakKeyToColor(key);
 	}
 }
+
+export function colorToKeyWithConfig(color: PixelColor, config: IdeConfig): string {
+	switch (config.keybindConfig) {
+		case "qwerty": return qwertyKeys[color];
+		case "colemak": return colemakKeys[color];
+		case "colemakdh": return colemakDHKeys[color];
+		case "dvorak": return dvorakKeys[color];
+	}
+}
+
+const qwertyKeys = ["1", "2", "3", "4", "q", "w", "e", "r", "a", "s", "d", "f", "z", "x", "c", "v"];
+const colemakKeys = ["1", "2", "3", "4", "q", "w", "f", "p", "a", "r", "s", "t", "z", "x", "c", "v"];
+const colemakDHKeys = ["1", "2", "3", "4", "q", "w", "f", "p", "a", "r", "s", "t", "z", "x", "c", "d"];
+const dvorakKeys = ["1", "2", "3", "4", "'", ",", ".", "p", "a", "o", "e", "u", ";", "q", "j", "k"];
 
 function qwertyKeyToColor(key: string): PixelColor | null {
 	switch (key) {

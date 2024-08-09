@@ -1,17 +1,17 @@
-import { PixelColor, GridMap, programTemplate } from "@/scripts/daedalus";
+import { PixelColor } from "@/scripts/daedalus";
 import Grid, { renderGrid } from "@/components/grid";
-import { useRef, useState, useEffect, MouseEvent as ReactMouseEvent, useCallback, KeyboardEvent } from "react";
+import { useRef, useState, useEffect, MouseEvent as ReactMouseEvent, KeyboardEvent } from "react";
 import SidePanel from "@/components/side_panel";
-import Toolbar from "./toolbar";
-import Settings from "./settings";
+import Settings from "@/components/settings";
 import { IdeConfig, defaultConfig, keyToColorWithConfig } from "@/scripts/config"
+import { DrawContext } from "@/scripts/draw_context";
 
 export default function Ide() {
 	const [selectedInstruction, setSelectedInstruction] = useState<PixelColor>(0);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [ideConfig, setIdeConfig] = useState(defaultConfig);
-	const gridItemRef = useRef<GridMap>(programTemplate);
-	const gridPreviewKeys = useRef<string[]>([]);
+
+	const drawCtxRef = useRef<DrawContext>(new DrawContext(true).initWithDefaultProgram());
 	const ideRef = useRef<HTMLDivElement | null>(null);
 
 	// WebGL stuff
@@ -34,7 +34,6 @@ export default function Ide() {
 			}
 			const typedConfig: IdeConfig = {
 				keybindConfig: config.keybindConfig,
-				drawMode: config.drawMode,
 			}
 			setIdeConfig(typedConfig);
 		}
@@ -49,54 +48,21 @@ export default function Ide() {
 
 	function handleClick(pos: [number, number], e: ReactMouseEvent<HTMLDivElement, MouseEvent>) {
 		if (e.button == 0) {
-			gridItemRef.current.set(`${pos[0]}_${pos[1]}`, [selectedInstruction, false]);
+			drawCtxRef.current.setPixel(pos[0], pos[1], selectedInstruction);
 			requestAnimationFrame(() => renderGrid(
 				glRef.current,
 				lineProgramRef.current,
 				pixelProgramRef.current,
-				gridItemRef.current,
+				drawCtxRef.current.gridMap,
 				true
 			));
 		} else if (e.button == 2) {
-			gridItemRef.current.delete(`${pos[0]}_${pos[1]}`);
+			drawCtxRef.current.setPixel(pos[0], pos[1], 15);
 			requestAnimationFrame(() => renderGrid(
 				glRef.current,
 				lineProgramRef.current,
 				pixelProgramRef.current,
-				gridItemRef.current,
-				true
-			));
-		}
-	}
-
-	// TODO: cleanup preview code (new shader?)
-	function handleGridPos(pos: [number, number], e: ReactMouseEvent<HTMLDivElement, MouseEvent>) {
-		const mapKey = `${pos[0]}_${pos[1]}`;
-
-		let needsReRender = false;
-		while (gridPreviewKeys.current.length != 0) {
-			const key = gridPreviewKeys.current.pop();
-			if (!key) break;
-			const item = gridItemRef.current.get(key);
-			if (!item || !item[1]) continue;
-			//delete existing previews
-			gridItemRef.current.delete(key);
-			needsReRender = true;
-		}
-
-		// set preview if spot doesn't have
-		if (!gridItemRef.current.get(mapKey)) {
-			gridItemRef.current.set(mapKey, [selectedInstruction, true])
-			gridPreviewKeys.current.push(mapKey);
-			needsReRender = true;
-		}
-
-		if (needsReRender) {
-			requestAnimationFrame(() => renderGrid(
-				glRef.current,
-				lineProgramRef.current,
-				pixelProgramRef.current,
-				gridItemRef.current,
+				drawCtxRef.current.gridMap,
 				true
 			));
 		}
@@ -116,26 +82,25 @@ export default function Ide() {
 			ref={ideRef}
 			tabIndex={0}
 		>
-			<div className="w-80 min-w-80 h-full overflow-scroll">
+			<div className="w-96 min-w-96 h-full overflow-scroll border-daedalus11 border-r-2">
 				<SidePanel
 					selectedInstruction={selectedInstruction}
 					setSelectedInstruction={setSelectedInstruction}
+					ideConfig={ideConfig}
 				/>
 			</div>
-			<div className="h-full w-full relative grid place-items-center">
+			<div className="h-full w-full">
 				<Grid
-					gridItemRef={gridItemRef}
+					drawCtxRef={drawCtxRef}
 					glRef={glRef}
 					lineProgramRef={lineProgramRef}
 					pixelProgramRef={pixelProgramRef}
 					onMouseDown={handleClick}
-					onMouseGrid={handleGridPos}
+					onMouseGrid={() => { }}
+					setSettingsOpen={setSettingsOpen}
+					selectedInstruction={selectedInstruction}
+					ideConfig={ideConfig}
 				/>
-				<div className="absolute bottom-8">
-					<Toolbar
-						setSettingsOpen={setSettingsOpen}
-					/>
-				</div>
 			</div>
 			{
 				settingsOpen &&

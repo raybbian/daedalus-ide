@@ -1,9 +1,12 @@
-import { colorToVec3, GridMap } from "@/scripts/daedalus";
-import { useEffect, useRef, useState, MutableRefObject, MouseEvent as ReactMouseEvent } from "react"
+import { colorToVec3, GridMap, PixelColor } from "@/scripts/daedalus";
+import { useEffect, useRef, useState, MutableRefObject, MouseEvent as ReactMouseEvent, Dispatch, SetStateAction } from "react"
 import gridLineVertShader from "@/shaders/grid_lines_v.glsl";
 import gridLineFragShader from "@/shaders/grid_lines_f.glsl";
 import pixelVertShader from "@/shaders/grid_pixel_v.glsl";
 import pixelFragShader from "@/shaders/grid_pixel_f.glsl";
+import { DrawContext } from "@/scripts/draw_context";
+import Toolbar from "./toolbar";
+import { IdeConfig } from "@/scripts/config";
 
 export function getGridAt(atPos: [number, number], pos: [number, number], unitLen: number): [number, number] {
 	const x = Math.floor((atPos[0] - pos[0]) / unitLen);
@@ -17,7 +20,7 @@ export function getGridAt(atPos: [number, number], pos: [number, number], unitLe
 // 	return [x, y];
 // }
 
-function updateGLUnitLen(gl: WebGL2RenderingContext | null, unitLen: number, programs: (WebGLProgram | null)[]) {
+export function updateGLUnitLen(gl: WebGL2RenderingContext | null, unitLen: number, programs: (WebGLProgram | null)[]) {
 	if (gl == null) return;
 	programs.forEach((program) => {
 		if (program == null) return;
@@ -73,17 +76,20 @@ export function renderGrid(
 
 const minUnitLen = 15;
 const maxUnitLen = 200;
-const defaultUnitLen = 50;
+export const defaultUnitLen = 40;
 
 export type GridMouseHandler = (pos: [number, number], e: ReactMouseEvent<HTMLDivElement, MouseEvent>) => void;
 
-export default function Grid({ gridItemRef, glRef, lineProgramRef, pixelProgramRef, onMouseDown, onMouseGrid }: {
-	gridItemRef: MutableRefObject<GridMap>,
+export default function Grid({ drawCtxRef, glRef, lineProgramRef, pixelProgramRef, onMouseDown, onMouseGrid, setSettingsOpen, selectedInstruction, ideConfig }: {
+	drawCtxRef: MutableRefObject<DrawContext>,
 	glRef: MutableRefObject<WebGL2RenderingContext | null>,
 	lineProgramRef: MutableRefObject<WebGLProgram | null>,
 	pixelProgramRef: MutableRefObject<WebGLProgram | null>,
 	onMouseDown: GridMouseHandler,
 	onMouseGrid: GridMouseHandler,
+	setSettingsOpen: Dispatch<SetStateAction<boolean>>,
+	selectedInstruction: PixelColor,
+	ideConfig: IdeConfig,
 }) {
 	// position of mouse and mouse interaction
 	const [dragging, setDragging] = useState(false);
@@ -240,7 +246,7 @@ export default function Grid({ gridItemRef, glRef, lineProgramRef, pixelProgramR
 					gl,
 					lineProgram,
 					pixelProgram,
-					gridItemRef.current,
+					drawCtxRef.current.gridMap,
 					false
 				));
 			}
@@ -249,30 +255,26 @@ export default function Grid({ gridItemRef, glRef, lineProgramRef, pixelProgramR
 		window.addEventListener('resize', handleResize);
 		initWebGL();
 
-		// intialize main function
-		gridItemRef.current.set("0_0", [12, false]);
-		gridItemRef.current.set("1_0", [0, false]);
-
-		updateGLUnitLen(glRef.current, 50, [lineProgramRef.current, pixelProgramRef.current]);
-		updateGLPos(glRef.current, [50, 50], [lineProgramRef.current, pixelProgramRef.current]);
+		updateGLUnitLen(glRef.current, defaultUnitLen, [lineProgramRef.current, pixelProgramRef.current]);
+		updateGLPos(glRef.current, [defaultUnitLen, defaultUnitLen], [lineProgramRef.current, pixelProgramRef.current]);
 
 		requestAnimationFrame(() => renderGrid(
 			glRef.current,
 			lineProgramRef.current,
 			pixelProgramRef.current,
-			gridItemRef.current,
+			drawCtxRef.current.gridMap,
 			true
 		));
 
 		handleResize();
 
 		return () => window.removeEventListener('resize', handleResize);
-	}, [gridItemRef, glRef, lineProgramRef, pixelProgramRef]);
+	}, [drawCtxRef, glRef, lineProgramRef, pixelProgramRef]);
 
 	return (
 		<div
 			// ref={canvasRef}
-			className={`w-full h-full bg-daedalus15 relative ${dragging && "cursor-grabbing"} overflow-hidden`}
+			className={`w-full h-full bg-daedalus15 relative ${dragging && "cursor-grabbing"} overflow-hidden relative grid place-items-center`}
 			onMouseDown={(e) => {
 				if (e.button == 1) {
 					e.preventDefault();
@@ -311,7 +313,7 @@ export default function Grid({ gridItemRef, glRef, lineProgramRef, pixelProgramR
 						glRef.current,
 						lineProgramRef.current,
 						pixelProgramRef.current,
-						gridItemRef.current,
+						drawCtxRef.current.gridMap,
 						false
 					));
 				} else {
@@ -336,7 +338,7 @@ export default function Grid({ gridItemRef, glRef, lineProgramRef, pixelProgramR
 					glRef.current,
 					lineProgramRef.current,
 					pixelProgramRef.current,
-					gridItemRef.current,
+					drawCtxRef.current.gridMap,
 					false
 				));
 			}}
@@ -349,6 +351,35 @@ export default function Grid({ gridItemRef, glRef, lineProgramRef, pixelProgramR
 				x: {curMouseGrid[0]} y: {curMouseGrid[1]}
 			</div>
 			<canvas width={500} height={300} className={"w-full h-full"} ref={gridCanvasRef} />
+			<div className="absolute bottom-8">
+				<Toolbar
+					setSettingsOpen={setSettingsOpen}
+					selectedInstruction={selectedInstruction}
+					ideConfig={ideConfig}
+					updateUnitLen={(nUnitLen: number) => {
+						updateGLUnitLen(glRef.current, nUnitLen, [lineProgramRef.current, pixelProgramRef.current]);
+						unitLen.current = nUnitLen;
+						requestAnimationFrame(() => renderGrid(
+							glRef.current,
+							lineProgramRef.current,
+							pixelProgramRef.current,
+							drawCtxRef.current.gridMap,
+							false
+						));
+					}}
+					updatePos={(nPos: [number, number]) => {
+						updateGLPos(glRef.current, nPos, [lineProgramRef.current, pixelProgramRef.current]);
+						pos.current = nPos;
+						requestAnimationFrame(() => renderGrid(
+							glRef.current,
+							lineProgramRef.current,
+							pixelProgramRef.current,
+							drawCtxRef.current.gridMap,
+							false
+						));
+					}}
+				/>
+			</div>
 		</div>
 	)
 }

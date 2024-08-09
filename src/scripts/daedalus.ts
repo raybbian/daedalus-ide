@@ -50,20 +50,61 @@ export function getRandomColor(): PixelColor {
 }
 
 export const instructionNamesAndId: [string, string, PixelColor][] = [
-	["Pop *", "Pops the top value off of the stack.", 0],
-	["Push(n) *", "Pushes the signed value n onto the stack.", 1],
-	["Dup(n) *", "Duplicates the value of the nth element (unsigned) from the top.", 2],
-	["Add *", "Adds (+) the top two values on the stack, and pushes the result.", 3],
-	["And *", "Ands (&) the top two values on the stack, and pushes the result.", 4],
-	["Not *", "Nots (!) the top value on the stack, and pushes the result.", 5],
-	["Getc *", "Reads a value from stdin, and pushes it to the stack.", 6],
-	["Putc *", "Outputs the top value of the stack to stdout.", 7],
-	["Jmp(n)", "Jumps to the subroutine marked by id n (signed).", 8],
+	["Pop", "Pops the top value off of the stack.", 0],
+	["Push(i64)", "Pushes the signed value n onto the stack.", 1],
+	["Dup(u64)", "Duplicates the value of the nth element (unsigned) from the top.", 2],
+	["Add", "Adds (+) the top two values on the stack, and pushes the result.", 3],
+	["And", "Ands (binary, &) the top two values on the stack, and pushes the result.", 4],
+	["Not", "Nots (binary, !) the top value on the stack, and pushes the result.", 5],
+	["Getc", "Reads a value from stdin, and pushes it to the stack.", 6],
+	["Putc", "Outputs the top value of the stack to stdout.", 7],
+	["Jmp(i64)", "Jumps to the subroutine marked by id n (signed).", 8],
 	["Ret", "Jumps to the caller of this subroutine", 9],
 	["Halt", "Halts the program, terminating it.", 10],
-	["NoOp", "Does nothing. A no-operation.", 11],
-	["Sbr(n)", "Marks the start of a subroutine with id n (signed).", 12],
+	["Set(u64, i64)", "Sets the nth element (unsigned) from the top to m (signed).", 11],
+	["Sbr(i64)", "Marks the start of a subroutine with id n (signed).", 12],
 	["Cmp", "The first statement read right, fwd, left is executed if the top value is > 0.", 13],
 	["Inst", "Marks the start of a stack-based instruction (Instructions 0-7).", 14],
 	["Bg", "Background color that is ignored during parsing.", 15],
 ]
+
+// function getBinary(a: bigint) {
+// 	if ((a > 0 && a >= 2n ** (BigInt(64) - 1n)) || (a < 0 && -a > 2n ** (BigInt(64) - 1n))) {
+// 		throw new RangeError("overflow error");
+// 	}
+//
+// 	return a >= 0
+// 		? a.toString(2).padStart(Number(nBits), "0")
+// 		: (2n ** nBits + a).toString(2);
+// }
+
+function unsignedToPixelArray(num: bigint): PixelColor[] {
+	const base8 = num.toString(8);
+	const out: PixelColor[] = [];
+	for (let i = 0; i < base8.length; i++) {
+		const val = parseInt(base8[i]);
+		// msb cannot be 1 if signed
+		out.push(val as PixelColor);
+	}
+	return out;
+}
+
+export function numberToPixelArray(num: bigint | '' | '-', isSigned: boolean): PixelColor[] {
+	if (num == '' || num == '-') return [];
+	if (num < BigInt(0) && !isSigned) return [];
+
+	if (num == BigInt(0)) {
+		return [0];
+	} else if (num >= BigInt(0)) {
+		const arr = unsignedToPixelArray(num);
+		if (isSigned && arr[0] >= 4) arr.unshift(0);
+		return arr;
+	} else {
+		const absNum = BigInt(-1) * num;
+		let msb = absNum.toString(2).length;
+		msb += (3 - msb % 3);
+		const newBig = BigInt("0b1".padEnd(msb + 3, '0'));
+		const pretendVal = newBig + num;
+		return unsignedToPixelArray(pretendVal);
+	}
+}
